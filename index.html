@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Puzzle Buah 2×2 (KB-TK Kebon Dalem 2)</title>
+
+  <style>
+    :root{
+      --bg:#0b1220; --panel:rgba(255,255,255,.08); --panel2:rgba(255,255,255,.12);
+      --text:rgba(255,255,255,.92); --muted:rgba(255,255,255,.70);
+      --radius:22px; --gap:14px; --tile-radius:18px;
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; margin:0; }
+
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:
+        radial-gradient(1200px 700px at 70% 20%, rgba(60,120,255,.18), transparent 60%),
+        radial-gradient(1000px 800px at 30% 80%, rgba(255,160,60,.16), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      overflow:hidden; /* desktop/tv default */
+    }
+
+    /* ====== FIX MOBILE: jangan matikan scroll global ======
+       - HILANGKAN touch-action:none & overscroll-behavior dari global class
+       - Biarkan body bisa scroll saat mobile override aktif
+    */
+    .no-gesture{
+      user-select:none;
+      -webkit-user-select:none;
+      -ms-user-select:none;
+    }
+
+    .app{
+      height:100%;
+      display:grid;
+      grid-template-columns:minmax(320px,1fr) minmax(320px,1.2fr);
+      gap:18px;
+      padding:18px;
+    }
+    @media (max-width:900px){
+      .app{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+    }
+
+    .card{
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:var(--radius);
+      box-shadow:0 20px 60px rgba(0,0,0,.35);
+      overflow:auto;
+    }
+
+    .header{
+      padding:16px 18px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:linear-gradient(to bottom, rgba(255,255,255,.08), transparent);
+    }
+    .title{ display:flex; flex-direction:column; gap:4px; }
+    .title h1{ font-size:20px; margin:0; letter-spacing:.3px; }
+    .title .sub{ font-size:13px; color:var(--muted); }
+
+    .controls{ display:flex; gap:10px; align-items:center; }
+
+    button{
+      appearance:none;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.10);
+      color:var(--text);
+      padding:10px 14px;
+      border-radius:14px;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform .08s ease, background .15s ease;
+      white-space: nowrap;
+    }
+    button:active{ transform:scale(.98); }
+    button:hover{ background:rgba(255,255,255,.14); }
+
+    .hint{ padding:14px 18px 18px; display:grid; gap:12px; }
+    .hintLabel{
+      font-weight:800; letter-spacing:.2px;
+      display:flex; align-items:baseline; gap:10px; flex-wrap: wrap;
+    }
+    .hintLabel .muted{ font-weight:700; color:var(--muted); font-size:13px; }
+
+    .hintImageWrap{
+      background:var(--panel2);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:18px;
+      padding:10px;
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      height:min(56vh, 520px);
+    }
+
+    /* ===== FIX: gambar contoh jangan dipaksa tinggi ===== */
+    #hintImage{
+      max-width:100%;
+      max-height:100%;
+      width:auto;
+      height:min(56vh, 520px);             /* FIX UTAMA */
+      object-fit:contain;
+      border-radius:14px;
+      display:block;
+      background:rgba(0,0,0,.15);
+    }
+
+    .status{ color:var(--muted); font-size:13px; line-height:1.4; }
+
+    .boardCard{ display:grid; grid-template-rows:auto 1fr; }
+    .boardWrap{ padding:16px 18px 18px; display:grid; place-items:center; height:100%; }
+
+    .board{
+      width:min(72vh, 640px);
+      aspect-ratio:1/1;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      grid-template-rows:1fr 1fr;
+      gap:var(--gap);
+      padding:var(--gap);
+      border-radius:28px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      position:relative;
+
+      /* ===== FIX MOBILE DRAG: matikan gesture hanya di papan puzzle ===== */
+      touch-action:none;
+      -ms-touch-action:none;
+    }
+    @media (max-width:900px){ .board{ width:min(92vw, 520px); } }
+
+    .slot{
+      position:relative;
+      border-radius:var(--tile-radius);
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      overflow:hidden;
+    }
+    .slot.target{
+      outline:4px solid rgba(255,255,255,.26);
+      outline-offset:-4px;
+    }
+
+    .tile{
+      width:100%; height:100%;
+      border-radius:var(--tile-radius);
+      background-repeat:no-repeat;
+      background-size:200% 200%;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+      touch-action:none; /* aman untuk tile */
+      cursor:grab;
+    }
+    .tile:active{ cursor:grabbing; }
+
+    .tileHidden{ visibility:hidden; }
+
+    .floating{
+      position:fixed;
+      z-index:9999;
+      width:var(--floatW);
+      height:var(--floatH);
+      border-radius:var(--tile-radius);
+      background-repeat:no-repeat;
+      background-size:200% 200%;
+      box-shadow:0 18px 55px rgba(0,0,0,.55);
+      transform:scale(1.03);
+      pointer-events:none;
+    }
+
+    .overlay{
+      position:fixed; inset:0;
+      display:grid; place-items:center;
+      background:rgba(0,0,0,.45);
+      opacity:0; pointer-events:none;
+      transition:opacity .18s ease;
+      z-index:10000;
+    }
+    .overlay.show{ opacity:1; pointer-events:none; }
+    .hebat{
+      font-size:clamp(52px, 8vw, 120px);
+      font-weight:900;
+      letter-spacing:2px;
+      text-shadow:0 20px 70px rgba(0,0,0,.65);
+      padding:22px 34px;
+      border-radius:26px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.18);
+      backdrop-filter:blur(10px);
+    }
+
+    /* =========================
+       MOBILE SUPPORT OVERRIDES
+       (tanpa ubah desain, hanya aktif di mobile)
+       ========================= */
+    @supports (height: 100dvh){
+      body{ min-height:100dvh; }
+    }
+
+    @media (max-width:900px){
+      body{
+        overflow:auto; /* ✅ mobile bisa scroll */
+        -webkit-overflow-scrolling:touch;
+      }
+
+      .app{
+        height:auto;
+        grid-template-columns:1fr;
+        grid-template-rows:auto auto;
+        padding:12px;
+        gap:12px;
+      }
+
+      .card{ overflow:visible; }
+
+      .controls{ flex-wrap:wrap; justify-content:flex-end; }
+
+      /* FIX typo: 520px */
+      .hintImageWrap{ height:min(56vh, 520px); }
+      #hintImage{ width:100%; height:min(56vh, 520px); max-height:100%; }
+
+      .boardWrap{ height:auto; padding:12px 0 16px; }
+      .board{ width:min(92vw, 520px); }
+    }
+
+    @media (max-width:420px){
+      :root{ --gap:10px; }
+      button{ padding:9px 12px; border-radius:12px; }
+      .header{ padding:14px; }
+    }
+
+    @media (max-width:900px) and (orientation: landscape){
+      .hintImageWrap{ height:min(56vh, 520px); }
+      .board{ width:min(70vw, 520px); }
+    }
+  </style>
+</head>
+
+<!-- FIX: jangan pakai no-gesture di BODY agar scroll mobile hidup -->
+<body class="no-gesture">
+  <div class="app">
+    <section class="card">
+      <div class="header">
+        <div class="title">
+          <h1>Puzzle Buah 2×2 (KB-TK Kebon Dalem 2)</h1>
+          <div class="sub">Geser potongan pakai jari sampai gambar benar.</div>
+        </div>
+        <div class="controls">
+          <button id="btnShuffle" type="button">Acak</button>
+          <button id="btnNext" type="button">Buah Berikutnya</button>
+        </div>
+      </div>
+
+      <div class="hint">
+        <div class="hintLabel">
+          Petunjuk: <span id="fruitName"></span>
+          <span class="muted">| gambar utuh</span>
+        </div>
+
+        <div class="hintImageWrap">
+          <img id="hintImage" alt="Petunjuk gambar buah" />
+        </div>
+
+        <div class="status" id="statusText">
+          Tips: tekan potongan lalu geser ke kotak lain untuk menukar posisi (swap).
+        </div>
+      </div>
+    </section>
+
+    <section class="card boardCard">
+      <div class="header">
+        <div class="title">
+          <h1>Susun Puzzle</h1>
+          <div class="sub">Selesai → “HEBAT!” + suara → lanjut gambar random.</div>
+        </div>
+      </div>
+
+      <div class="boardWrap">
+        <div id="board" class="board no-gesture" aria-label="papan puzzle"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <div class="hebat">HEBAT!</div>
+  </div>
+
+  <!-- Apel, ceri, jeruk, belimbing, stroberi, pisang, wortel -->
+  <script> 
+    const FRUITS = [
+      { key: "apel",      label: "Apel",      imageUrl: "./images/apel.jpeg" },
+      { key: "ceri",      label: "Ceri",      imageUrl: "./images/ceri.jpeg" },
+      { key: "jeruk",     label: "Jeruk",     imageUrl: "./images/jeruk.jpeg" },
+      { key: "belimbing", label: "Belimbing", imageUrl: "./images/belimbing.jpeg" },
+      { key: "stroberi",  label: "Stroberi",  imageUrl: "./images/stroberi.jpeg" },
+      { key: "pisang",    label: "Pisang",    imageUrl: "./images/pisang.jpeg" },
+      { key: "wortel",    label: "Wortel",    imageUrl: "./images/wortel.jpeg" },
+    ];
+
+    const boardEl = document.getElementById("board");
+    const hintImgEl = document.getElementById("hintImage");
+    const fruitNameEl = document.getElementById("fruitName");
+    const overlayEl = document.getElementById("overlay");
+    const statusTextEl = document.getElementById("statusText");
+    const btnShuffle = document.getElementById("btnShuffle");
+    const btnNext = document.getElementById("btnNext");
+
+    let order = [0,1,2,3];
+    let currentFruitIndex = 0;
+    let lastFruitIndex = -1;
+    let isLocked = false;
+
+    let dragging = null;
+    let audioCtx = null;
+
+    function shuffleArray(arr){
+      for (let i = arr.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function pickNextFruitIndex(){
+      const candidates = FRUITS.map((_, i) => i).filter(i => i !== lastFruitIndex);
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    function pieceBackgroundPosition(pieceId){
+      const col = pieceId % 2;
+      const row = Math.floor(pieceId / 2);
+      return `${col * 100}% ${row * 100}%`;
+    }
+
+    function waitImageLoaded(imgEl, src){
+      return new Promise((resolve) => {
+        imgEl.onload = () => resolve(true);
+        imgEl.onerror = () => resolve(false);
+        imgEl.src = src;
+      });
+    }
+
+    function clearTargetHighlight(){
+      boardEl.querySelectorAll(".slot.target").forEach(s => s.classList.remove("target"));
+    }
+
+    function findSlotFromPoint(x, y){
+      const el = document.elementFromPoint(x, y);
+      if (!el) return null;
+      return el.closest?.(".slot") || null;
+    }
+
+    function isValidSlotIndex(n){
+      return Number.isInteger(n) && n >= 0 && n <= 3;
+    }
+
+    function swapSlots(a, b){
+      const tmp = order[a];
+      order[a] = order[b];
+      order[b] = tmp;
+    }
+    function getNextFruitIndex(){
+      return (currentFruitIndex + 1) % FRUITS.length;
+    } 
+    function forceCancelDrag(){
+      document.querySelectorAll(".floating").forEach(el => el.remove());
+      clearTargetHighlight();
+
+      if (dragging?.sourceTileEl){
+        dragging.sourceTileEl.classList.remove("tileHidden");
+      }
+
+      window.removeEventListener("pointermove", onTilePointerMove, { passive:false });
+      window.removeEventListener("pointerup", onTilePointerUp, { passive:false });
+      window.removeEventListener("pointercancel", onTilePointerCancel, { passive:false });
+
+      dragging = null;
+    }
+
+    function renderBoard(){
+      boardEl.innerHTML = "";
+      const imgUrl = FRUITS[currentFruitIndex].imageUrl;
+
+      for (let slot = 0; slot < 4; slot++){
+        const slotEl = document.createElement("div");
+        slotEl.className = "slot no-gesture";
+        slotEl.dataset.slot = String(slot);
+
+        const pieceId = order[slot];
+
+        const tileEl = document.createElement("div");
+        tileEl.className = "tile no-gesture";
+        tileEl.dataset.piece = String(pieceId);
+        tileEl.dataset.slot = String(slot);
+        tileEl.style.backgroundImage = `url("${imgUrl}")`;
+        tileEl.style.backgroundPosition = pieceBackgroundPosition(pieceId);
+
+        tileEl.addEventListener("pointerdown", onTilePointerDown, { passive:false });
+        slotEl.appendChild(tileEl);
+        boardEl.appendChild(slotEl);
+      }
+    }
+
+    function resetAndShuffle(){
+      forceCancelDrag();
+      order = [0,1,2,3];
+      do { order = shuffleArray(order.slice()); }
+      while (order.join(",") === "0,1,2,3");
+      renderBoard();
+    }
+
+    async function loadFruit(index){
+      forceCancelDrag();
+      isLocked = true;
+
+      currentFruitIndex = index;
+      lastFruitIndex = index;
+
+      const fruit = FRUITS[currentFruitIndex];
+      fruitNameEl.textContent = fruit.label;
+
+      statusTextEl.textContent = "Memuat gambar…";
+      await waitImageLoaded(hintImgEl, fruit.imageUrl);
+
+      statusTextEl.textContent = "Drag potongan ke kotak lain untuk menukar posisi (swap).";
+      resetAndShuffle();
+
+      isLocked = false;
+    }
+
+    function onTilePointerDown(e){
+      if (isLocked) return;
+      if (dragging) return;
+
+      if (!audioCtx){
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+      }
+
+      const tile = e.currentTarget;
+      const fromSlot = Number(tile.dataset.slot);
+      const pieceId = Number(tile.dataset.piece);
+
+      const rect = tile.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+
+      const floating = document.createElement("div");
+      floating.className = "floating";
+      floating.style.setProperty("--floatW", `${rect.width}px`);
+      floating.style.setProperty("--floatH", `${rect.height}px`);
+      floating.style.backgroundImage = tile.style.backgroundImage;
+      floating.style.backgroundPosition = tile.style.backgroundPosition;
+      floating.style.left = `${e.clientX - offsetX}px`;
+      floating.style.top  = `${e.clientY - offsetY}px`;
+      document.body.appendChild(floating);
+
+      tile.classList.add("tileHidden");
+
+      dragging = {
+        fromSlot,
+        pieceId,
+        pointerId: e.pointerId,
+        offsetX,
+        offsetY,
+        floatingEl: floating,
+        sourceTileEl: tile,
+        targetSlotEl: null,
+      };
+
+      window.addEventListener("pointermove", onTilePointerMove, { passive:false });
+      window.addEventListener("pointerup", onTilePointerUp, { passive:false });
+      window.addEventListener("pointercancel", onTilePointerCancel, { passive:false });
+
+      e.preventDefault();
+    }
+
+    function onTilePointerMove(e){
+      if (!dragging) return;
+      if (e.pointerId !== dragging.pointerId) return;
+
+      dragging.floatingEl.style.left = `${e.clientX - dragging.offsetX}px`;
+      dragging.floatingEl.style.top  = `${e.clientY - dragging.offsetY}px`;
+
+      const slotEl = findSlotFromPoint(e.clientX, e.clientY);
+      clearTargetHighlight();
+
+      if (slotEl){
+        slotEl.classList.add("target");
+        dragging.targetSlotEl = slotEl;
+      } else {
+        dragging.targetSlotEl = null;
+      }
+
+      e.preventDefault();
+    }
+
+    function cleanupDragOnly(){
+      if (!dragging) return;
+
+      clearTargetHighlight();
+      dragging.floatingEl?.remove();
+      dragging.sourceTileEl?.classList.remove("tileHidden");
+
+      window.removeEventListener("pointermove", onTilePointerMove, { passive:false });
+      window.removeEventListener("pointerup", onTilePointerUp, { passive:false });
+      window.removeEventListener("pointercancel", onTilePointerCancel, { passive:false });
+
+      dragging = null;
+    }
+
+    function onTilePointerUp(e){
+      if (!dragging) return;
+      if (e.pointerId !== dragging.pointerId) return;
+
+      const targetSlotEl = dragging.targetSlotEl || findSlotFromPoint(e.clientX, e.clientY);
+      const fromSlot = dragging.fromSlot;
+
+      let toSlot = null;
+      if (targetSlotEl?.dataset?.slot != null){
+        const n = Number(targetSlotEl.dataset.slot);
+        if (isValidSlotIndex(n)) toSlot = n;
+      }
+
+      cleanupDragOnly();
+
+      if (toSlot !== null && toSlot !== fromSlot){
+        swapSlots(fromSlot, toSlot);
+      }
+
+      renderBoard();
+      if (checkWin()) onWin();
+
+      e.preventDefault();
+    }
+
+    function onTilePointerCancel(e){
+      if (!dragging) return;
+      if (e.pointerId !== dragging.pointerId) return;
+
+      cleanupDragOnly();
+      renderBoard();
+      e.preventDefault();
+    }
+
+    function checkWin(){
+      return order[0]===0 && order[1]===1 && order[2]===2 && order[3]===3;
+    }
+
+    function showHebat(){
+      overlayEl.classList.add("show");
+      setTimeout(() => overlayEl.classList.remove("show"), 900);
+    }
+
+    function playWinSound(){
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const freqs = [523.25, 659.25, 783.99];
+
+      freqs.forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(f, now + i * 0.10);
+
+        gain.gain.setValueAtTime(0.0001, now + i * 0.10);
+        gain.gain.exponentialRampToValueAtTime(0.22, now + i * 0.10 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.10 + 0.16);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now + i * 0.10);
+        osc.stop(now + i * 0.10 + 0.18);
+      });
+    }
+
+    function onWin(){
+      isLocked = true;
+      forceCancelDrag();
+      showHebat();
+      playWinSound();
+
+      setTimeout(async () => {
+        await loadFruit(getNextFruitIndex());
+        isLocked = false;
+      }, 1100);
+    }
+
+    btnShuffle.addEventListener("click", () => {
+      if (isLocked) return;
+      resetAndShuffle();
+    });
+
+    btnNext.addEventListener("click", async () => {
+      if (isLocked) return;
+      await loadFruit(getNextFruitIndex());
+    });
+
+    (async function init(){
+      await loadFruit(0);
+    })();
+  </script>
+</body>
+</html>
